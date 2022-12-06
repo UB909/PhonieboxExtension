@@ -1,5 +1,4 @@
 #!/bin/python3
-
 # executed by /etc/rc.local
 
 # GPIO-Bibliothek laden
