@@ -1,6 +1,4 @@
 #!/bin/python3
-
-# GPIO-Bibliothek laden
 import RPi.GPIO as GPIO
 
 # BCM-Nummerierung verwenden
