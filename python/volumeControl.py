@@ -100,10 +100,11 @@ while(True) :
     if(x == "+") :
       increaseBy = min(0.025, 1.0 - volumeCtrl.volume_get_all_chans(sink))
       volumeCtrl.volume_change_all_chans(sink, increaseBy)
-      lastVolumeUpdate = datetime.now()
     else :
       volumeCtrl.volume_change_all_chans(sink, -0.025)
-      lastVolumeUpdate = datetime.now()
+
+    lastVolumeUpdate = datetime.now()
+    lastSound = datetime.now()
 
   if((datetime.now() - lastVolumeUpdate).total_seconds() < 2) :
     showVolume(ser, volumeCtrl.volume_get_all_chans(sink))
