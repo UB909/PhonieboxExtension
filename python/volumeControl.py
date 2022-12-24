@@ -1,9 +1,15 @@
-#!/bin/python3
+#!/usr/bin/env python3
 import serial
 import pulsectl
+import subprocess
+import sys
 import time
 import impulse
 from datetime import datetime
+from os.path import exists
+
+lastVolumeUpdate = datetime.now()
+lastSound = datetime.now()
 
 def showVolume(ser, volume) :
   # print(volume)
@@ -29,6 +35,9 @@ def showVolume(ser, volume) :
 
 lastValues = [0, 0, 0]
 def vuMeter(ser) :
+  global lastSound
+  global lastValues
+
   audio_sample_array = impulse.getSnapshot(True)[:128]
   sum = 0
   for x in audio_sample_array :
@@ -39,8 +48,22 @@ def vuMeter(ser) :
     lastValues[i-1] = lastValues[i]
     val = max(val, lastValues[i])
   lastValues[len(lastValues)-1] = sum
+  
+  if(val > 0.0) :
+    lastSound = datetime.now()
 
-  showVolume(ser, val/20)
+  if((datetime.now() - lastSound).total_seconds() < 10) :
+    showVolume(ser, val/20)
+  elif((datetime.now() - lastSound).total_seconds() < 270) :
+    ser.write(bytes([128]))
+  elif((datetime.now() - lastSound).total_seconds() < 300) :
+    if(int((datetime.now() - lastSound).total_seconds()*2) % 2 == 0) : 
+      ser.write(bytes([255]))
+    else :
+      ser.write(bytes([0]))
+  else :
+    p = subprocess.Popen('/usr/sbin/poweroff', stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    quit()
 
 ########################################################33
 # Initialize Volume Control
@@ -48,7 +71,10 @@ volumeCtrl = pulsectl.Pulse('volume-increaser')
 sink = volumeCtrl.sink_list()[0]
 
 # Init serial monitor
-time.sleep(2)
+while(not exists('/dev/ttyUSB0')) :
+  print('wait for usb')
+  time.sleep(1)
+
 ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
 # Read Arduino welcome message
 time.sleep(2)
@@ -64,7 +90,6 @@ print("ready")
 
 ########################################################33
 # Main loop
-lastUpdate = datetime.now()
 while(True) :
   time.sleep(0.05)
   
@@ -73,13 +98,14 @@ while(True) :
     x = ser.read().decode()
     print(x)
     if(x == "+") :
-      volumeCtrl.volume_change_all_chans(sink, 0.025)
-      lastUpdate = datetime.now()
+      increaseBy = min(0.025, 1.0 - volumeCtrl.volume_get_all_chans(sink))
+      volumeCtrl.volume_change_all_chans(sink, increaseBy)
+      lastVolumeUpdate = datetime.now()
     else :
       volumeCtrl.volume_change_all_chans(sink, -0.025)
-      lastUpdate = datetime.now()
+      lastVolumeUpdate = datetime.now()
 
-  if((datetime.now() - lastUpdate).total_seconds() < 2) :
+  if((datetime.now() - lastVolumeUpdate).total_seconds() < 2) :
     showVolume(ser, volumeCtrl.volume_get_all_chans(sink))
   else :
     vuMeter(ser)
